@@ -5,6 +5,45 @@ set(FTPSRV_VERSION_MINOR 2)
 set(FTPSRV_VERSION_PATCH 2)
 set(FTPSRV_VERSION ${FTPSRV_VERSION_MAJOR}.${FTPSRV_VERSION_MINOR}.${FTPSRV_VERSION_PATCH})
 
+set(gcc_warning_flags
+    -Wall
+    -Wextra
+
+    # unsure if it's a good idea to enable these by default as
+    # it may cause breakage upon compiler updates.
+    # -Werror
+    # -Wfatal-errors
+
+    # disabled as nx uses s64 for size and offset, however stl uses size_t instead, thus
+    # there being a lot of warnings.
+    -Wno-sign-compare
+    # disabled as many overriden methods don't use the params.
+    -Wno-unused-parameter
+    # pedantic warning, missing fields are set to 0.
+    -Wno-missing-field-initializers
+    # disabled as it warns for strcat 2 paths together, but it will never
+    # overflow due to fs enforcing a max path len anyway.
+    -Wno-format-truncation
+
+    # the below are taken from my gba emulator, they've served me well ;)
+    -Wformat-overflow=2
+    -Wundef
+    -Wmissing-include-dirs
+    -fstrict-aliasing
+    -Wstrict-overflow=2
+    -Walloca
+    -Wduplicated-cond
+    -Wwrite-strings
+    -Wdate-time
+    -Wlogical-op
+    -Wpacked
+    -Wcast-qual
+    -Wcast-align
+    -Wimplicit-fallthrough=5
+    -Wsuggest-final-types
+    -Wuninitialized
+)
+
 project(ftpsrv
     LANGUAGES C
     VERSION ${FTPSRV_VERSION}
@@ -180,7 +219,7 @@ function(ftp_add name)
 
     target_compile_options(${name} PRIVATE
         $<$<OR:$<C_COMPILER_ID:Clang>,$<C_COMPILER_ID:AppleClang>,$<C_COMPILER_ID:GNU>>:
-            -Wall
+            ${gcc_warning_flags}
         >
         $<$<C_COMPILER_ID:MSVC>:
             /W4
@@ -237,7 +276,7 @@ else()
             set(USE_VFS_ROMFS TRUE)
         endif()
 
-        ftp_set_options(ftpsrv 769 128 1024*64)
+        ftp_set_options(ftpsrv 769 32 1024*64)
         fetch_minini()
 
         set(NX_SRC
@@ -273,6 +312,7 @@ else()
             src/platform/nx/main.c
             ${NX_SRC}
         )
+        target_compile_options(ftpexe PRIVATE ${gcc_warning_flags})
 
         target_compile_definitions(ftpsrv PUBLIC
             USE_VFS_SAVE=$<BOOL:${USE_VFS_SAVE}>
@@ -377,8 +417,9 @@ else()
             src/platform/nx/main_sysmod.c
             ${NX_SRC}
         )
-        ftp_add(sysftp)
+        target_compile_options(sysftp PRIVATE ${gcc_warning_flags})
         target_link_libraries(sysftp PRIVATE ftpsrv_sysmod minIni)
+        ftp_add(sysftp)
 
         target_compile_definitions(ftpsrv_sysmod PUBLIC
             USE_VFS_SAVE=$<BOOL:${USE_VFS_SAVE}>
@@ -419,6 +460,7 @@ else()
             src/platform/unistd/vfs_unistd.c
             src/log/log.c
         )
+        target_compile_options(ftpexe PRIVATE ${gcc_warning_flags})
         target_link_libraries(ftpexe PRIVATE ftpsrv minIni fat dswifi9)
         ftp_add(ftpexe)
 
@@ -428,7 +470,7 @@ else()
             SUBTITLE2 "TJ"
         )
     elseif(NINTENDO_3DS)
-        ftp_set_options(ftpsrv 769 64 1024*64)
+        ftp_set_options(ftpsrv 769 10 1024*64)
         fetch_minini()
 
         target_compile_definitions(ftpsrv PUBLIC
@@ -441,6 +483,7 @@ else()
             src/platform/unistd/vfs_unistd.c
             src/log/log.c
         )
+        target_compile_options(ftpexe PRIVATE ${gcc_warning_flags})
         target_link_libraries(ftpexe PRIVATE ftpsrv minIni)
         ftp_add(ftpexe)
 
@@ -468,6 +511,7 @@ else()
             src/platform/unistd/vfs_unistd.c
             src/log/log.c
         )
+        target_compile_options(ftpexe PRIVATE ${gcc_warning_flags})
         target_link_libraries(ftpexe PRIVATE ftpsrv fat minIni)
         ftp_add(ftpexe)
 
@@ -499,6 +543,7 @@ else()
         add_executable(ftpexe
             src/platform/ps4/main.c
         )
+        target_compile_options(ftpexe PRIVATE ${gcc_warning_flags})
         target_link_libraries(ftpexe PRIVATE ftpsrv)
         ftp_add(ftpexe)
 
@@ -519,6 +564,7 @@ else()
             src/platform/unistd/vfs_unistd.c
             src/args/args.c
         )
+        target_compile_options(ftpexe PRIVATE ${gcc_warning_flags})
         target_link_libraries(ftpexe PRIVATE ftpsrv)
         ftp_add(ftpexe)
     endif()
