@@ -1092,8 +1092,9 @@ static void ftp_list_directory(struct FtpSession* session, const char* data, enu
     struct Pathname pathname = {0};
     int rc = snprintf(pathname.s, sizeof(pathname), "%s", data);
 
-    // see issue: #2
-    if (rc == 0 || !strcmp("-a", pathname.s) || !strcmp("-la", pathname.s)) {
+    // NOTE: if breaking RFC wasn't enough, clients have started sending -a and -la
+    // with trailing spaces...brilliant.
+    if (rc == 0 || !strncmp("-a", pathname.s, strlen("-a")) || !strncmp("-la", pathname.s, strlen("-la"))) {
         session->temp_path = session->pwd;
     } else {
         rc = build_fullpath(session, &session->temp_path, pathname);
