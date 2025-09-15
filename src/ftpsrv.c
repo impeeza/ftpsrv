@@ -143,7 +143,7 @@ struct FtpSession {
     struct sockaddr_in data_sockaddr;
     struct sockaddr_in pasv_sockaddr;
 
-    long server_marker; // file offset when using REST
+    size_t server_marker; // file offset when using REST
 
     time_t last_update_time; // time since sessions last updated
 
@@ -966,7 +966,7 @@ static void ftp_cmd_MODE(struct FtpSession* session, const char* data) {
 
 static void ftp_open_file(struct FtpSession* session, const char* data, enum FtpVfsOpenMode open_mode, enum FTP_TRANSFER_MODE transfer_mode, int error_code) {
     session->transfer.offset = 0;
-    if (session->server_marker > 0) {
+    if (session->server_marker) {
         session->transfer.offset = session->server_marker;
         session->server_marker = 0;
     }
@@ -1024,9 +1024,9 @@ static void ftp_cmd_ALLO(struct FtpSession* session, const char* data) {
 // REST <SP> <marker> <CRLF> | 500, 501, 502, 421, 530, 350
 static void ftp_cmd_REST(struct FtpSession* session, const char* data) {
     char* end_ptr;
-    const long server_marker = strtol(data, &end_ptr, 10);
+    const size_t server_marker = strtoul(data, &end_ptr, 10);
 
-    if ((!server_marker && data == end_ptr) || server_marker < 0) {
+    if ((!server_marker && data == end_ptr) || server_marker == (size_t)-1) {
         ftp_client_msg(session, 501, "Syntax error in parameters or arguments.");
     } else {
         session->server_marker = server_marker;
@@ -1337,7 +1337,7 @@ static void ftp_cmd_SIZE(struct FtpSession* session, const char* data) {
     int rc = ftp_get_stat(session, data, &fullpath, &st);
 
     if (!rc) {
-        ftp_client_msg(session, 213, "%d", st.st_size);
+        ftp_client_msg(session, 213, "%zu", (size_t)st.st_size);
     }
 }
 

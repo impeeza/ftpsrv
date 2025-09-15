@@ -464,8 +464,8 @@ void vfs_nx_init(const struct VfsNxCustomPath* custom, int custom_count, bool en
 #endif
         if (custom && custom_count > 0) {
             for (int i = 0; i < custom_count; i++) {
-                vfs_nx_add_device(custom->name, VFS_TYPE_USER1 + i);
-                g_vfs[VFS_TYPE_USER1 + i] = custom->func;
+                vfs_nx_add_device(custom[i].name, VFS_TYPE_USER1 + i);
+                g_vfs[VFS_TYPE_USER1 + i] = custom[i].func;
             }
         }
 
