@@ -40,7 +40,14 @@ static const FtpVfs* g_vfs[] = {
     [VFS_TYPE_STDIO] = &g_vfs_stdio,
     [VFS_TYPE_HDD] = &g_vfs_hdd,
 #endif
-    [VFS_TYPE_USER] = NULL,
+    [VFS_TYPE_USER1] = NULL,
+    [VFS_TYPE_USER2] = NULL,
+    [VFS_TYPE_USER3] = NULL,
+    [VFS_TYPE_USER4] = NULL,
+    [VFS_TYPE_USER5] = NULL,
+    [VFS_TYPE_USER6] = NULL,
+    [VFS_TYPE_USER7] = NULL,
+    [VFS_TYPE_USER8] = NULL,
 };
 
 static bool is_path(const char* path, const char* name) {
@@ -360,7 +367,7 @@ static const struct MountEntry BIS_NAMES[] = {
     { "bis_system", FsBisPartitionId_System },
 };
 
-void vfs_nx_init(const struct VfsNxCustomPath* custom, bool enable_devices, bool save_writable, bool mount_bis, bool skip_ascii_convert) {
+void vfs_nx_init(const struct VfsNxCustomPath* custom, int custom_count, bool enable_devices, bool save_writable, bool mount_bis, bool skip_ascii_convert) {
     g_enabled_devices = enable_devices;
     g_skip_ascii_convert = skip_ascii_convert;
 
@@ -455,9 +462,11 @@ void vfs_nx_init(const struct VfsNxCustomPath* custom, bool enable_devices, bool
             vfs_nx_add_device("hdd", VFS_TYPE_HDD);
         }
 #endif
-        if (custom) {
-            vfs_nx_add_device(custom->name, VFS_TYPE_USER);
-            g_vfs[VFS_TYPE_USER] = custom->func;
+        if (custom && custom_count > 0) {
+            for (int i = 0; i < custom_count; i++) {
+                vfs_nx_add_device(custom->name, VFS_TYPE_USER1 + i);
+                g_vfs[VFS_TYPE_USER1 + i] = custom->func;
+            }
         }
 
         vfs_root_init(g_device, &g_device_count);

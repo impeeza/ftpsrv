@@ -117,7 +117,7 @@ static u32 mmz_build_file_header(const struct mmz_Data* mz, struct mmz_FileHeade
     file->local_hdr_off = mz->local_hdr_off;
     struct tm tm = {0};
     if (localtime_r(&mz->time, &tm)) {
-        file->modtime = (tm.tm_sec) | ((tm.tm_min) << 5) | (tm.tm_hour << 11);
+        file->modtime = (tm.tm_sec >> 1) | ((tm.tm_min) << 5) | (tm.tm_hour << 11);
         file->moddate = (tm.tm_mday) | ((tm.tm_mon + 1) << 5) | ((tm.tm_year > 80 ? tm.tm_year - 80 : 0) << 9);
     }
     return sizeof(*file) + mz->meta.string_len;
