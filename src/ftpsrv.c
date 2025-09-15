@@ -84,6 +84,7 @@ enum FTP_TRANSFER_MODE {
     FTP_TRANSFER_MODE_STOR, // transfer using STOR
     FTP_TRANSFER_MODE_LIST, // transfer using LIST
     FTP_TRANSFER_MODE_NLST, // transfer using NLST
+    FTP_TRANSFER_MODE_MLSD, // transfer using NLST
 };
 
 enum FTP_AUTH_MODE {
@@ -396,6 +397,69 @@ static int ftp_build_list_entry(struct FtpSession* session, const struct Pathnam
     return rc;
 }
 
+static int ftp_build_mlst_entry(const char* name, const struct stat* st, char* out, int* out_len) {
+    int rc;
+
+    struct tm tm = {0};
+    unpack_time(&st->st_mtime, &tm);
+
+    const char* type = "file";
+    if (S_ISDIR(st->st_mode)) {
+        type = "dir";
+    } else if (S_ISLNK(st->st_mode)) {
+        type = "link";
+    }
+
+    char modify[16] = {0};
+    snprintf(modify, sizeof(modify), "%04u%02u%02u%02u%02u%02u",
+        st->st_mtime ? (tm.tm_year + 1900) : 1970,
+        st->st_mtime ? (tm.tm_mon + 1) : 1,
+        st->st_mtime ? tm.tm_mday : 1,
+        st->st_mtime ? tm.tm_hour : 0,
+        st->st_mtime ? tm.tm_min : 0,
+        st->st_mtime ? tm.tm_sec : 0
+    );
+
+    char perms[16] = {0};
+    const bool writeable = st->st_mode & S_IWUSR;
+    const bool is_dir = S_ISDIR(st->st_mode);
+
+    if (is_dir) {
+        if (writeable) {
+            strcpy(perms, "cdeflmp");
+        } else {
+            strcpy(perms, "el");
+        }
+    } else {
+        if (writeable) {
+            strcpy(perms, "adfrw");
+        } else {
+            strcpy(perms, "r");
+        }
+    }
+
+    // send the header
+    rc = snprintf(out, *out_len, "Type=%s;Size=%zu;Modify=%s;Perm=%s;UNIX.mode=%04o;UNIX.owner=%d;UNIX.group=%d; %s" TELNET_EOL,
+        type,
+        (size_t)st->st_size,
+        modify,
+        perms,
+        st->st_mode & ALLPERMS, // only the permission bits
+        st->st_uid,
+        st->st_gid,
+        name
+    );
+
+    // don't send anything on error or truncated
+    if (rc <= 0 || rc > *out_len) {
+        rc = -1;
+    } else {
+        *out_len = rc;
+    }
+
+    return rc;
+}
+
 static void ftp_session_send(struct FtpSession* session);
 
 static void ftp_client_msg(struct FtpSession* session, unsigned code, const char* fmt, ...) {
@@ -571,7 +635,13 @@ static enum FTP_FILE_TRANSFER_STATE ftp_dir_data_transfer_progress(struct FtpSes
             return FTP_FILE_TRANSFER_STATE_CONTINUE;
         }
 
-        ftp_build_list_entry(session, &filepath, name, &st);
+        if (transfer->mode == FTP_TRANSFER_MODE_MLSD) {
+            int len = sizeof(transfer->list_buf);
+            ftp_build_mlst_entry(name, &st, transfer->list_buf, &len);
+            transfer->size = len;
+        } else {
+            ftp_build_list_entry(session, &filepath, name, &st);
+        }
     }
 
     return FTP_FILE_TRANSFER_STATE_CONTINUE;
@@ -1122,6 +1192,15 @@ static void ftp_list_directory(struct FtpSession* session, const char* data, enu
                 } else {
                     ftp_data_open(session, mode);
                 }
+            } else if (mode == FTP_TRANSFER_MODE_MLSD) {
+                int len = sizeof(session->transfer.list_buf);
+                rc = ftp_build_mlst_entry(pathname.s, &st, session->transfer.list_buf, &len);
+                if (rc < 0) {
+                    ftp_client_msg(session, 450, "Requested file action not taken, %s. Failed to build entry: %s.", strerror(errno), session->temp_path.s);
+                } else {
+                    session->transfer.size = len;
+                    ftp_data_open(session, mode);
+                }
             } else {
                 ftp_client_msg(session, 450, "Requested file action not taken. Nlist on file is not valid.");
             }
@@ -1168,11 +1247,50 @@ static void ftp_cmd_NOOP(struct FtpSession* session, const char* data) {
 static void ftp_cmd_FEAT(struct FtpSession* session, const char* data) {
     ftp_client_msg(session, 211,
         "-Extensions supported:" TELNET_EOL
-        " SIZE" TELNET_EOL
-        " UTF8" TELNET_EOL
         " MDTM" TELNET_EOL
+        " SIZE" TELNET_EOL
         " TVFS" TELNET_EOL
+        " UTF8" TELNET_EOL
+        " MLST Type*;Size*;Modify*;Perm*;UNIX.mode*;UNIX.owner;UNIX.group;" TELNET_EOL
     );
+}
+
+// MLST <CRLF> | 211, 550
+static void ftp_cmd_MLST(struct FtpSession* session, const char* data) {
+    struct Pathname pathname = {0};
+    int rc = snprintf(pathname.s, sizeof(pathname), "%s", data);
+
+    // NOTE: if breaking RFC wasn't enough, clients have started sending -a and -la
+    // with trailing spaces...brilliant.
+    if (rc == 0 || !strncmp("-a", pathname.s, strlen("-a")) || !strncmp("-la", pathname.s, strlen("-la"))) {
+        session->temp_path = session->pwd;
+    } else {
+        rc = build_fullpath(session, &session->temp_path, pathname);
+    }
+
+    if (rc < 0 || rc >= sizeof(pathname)) {
+        ftp_client_msg(session, 501, "Syntax error in parameters or arguments.");
+    } else {
+        struct stat st = {0};
+        rc = ftp_vfs_lstat(session->temp_path.s, &st);
+        if (rc < 0) {
+            ftp_client_msg(session, 450, "Requested file action not taken. %s. Failed to stat path: %s.", strerror(errno), session->temp_path.s);
+        } else {
+            char buf[1024] = {0};
+            int len = sizeof(buf);
+            rc = ftp_build_mlst_entry(pathname.s, &st, buf, &len);
+            if (rc < 0) {
+                ftp_client_msg(session, 450, "Requested file action not taken, %s. Failed to build entry: %s.", strerror(errno), session->temp_path.s);
+            } else {
+                ftp_client_msg(session, 250, "- Listing" TELNET_EOL " %s", buf);
+            }
+        }
+    }
+}
+
+// MLSD <CRLF> | 211, 550
+static void ftp_cmd_MLSD(struct FtpSession* session, const char* data) {
+    ftp_list_directory(session, data, FTP_TRANSFER_MODE_MLSD);
 }
 
 // OPTS <SP> <opts> <CRLF> | 200, 501
@@ -1186,6 +1304,8 @@ static void ftp_cmd_OPTS(struct FtpSession* session, const char* data) {
     } else {
         ftp_client_msg(session, 501, "Syntax error in parameters or arguments. %s", data);
     }
+
+    // todo: handle OPTS MLST to toggle facts.
 }
 
 static int ftp_get_stat(struct FtpSession* session, const char* data, struct Pathname* fullpath, struct stat* st) {
@@ -1279,6 +1399,8 @@ static const struct FtpCommand FTP_COMMANDS[] = {
     // extensions
     { .name = "FEAT", .func = ftp_cmd_FEAT, .auth_required = 0, .args_required = 0, .data_connection_required = 0 },
     // RFC 3659: https://datatracker.ietf.org/doc/html/rfc3659
+    { .name = "MLST", .func = ftp_cmd_MLST, .auth_required = 1, .args_required = 0, .data_connection_required = 0 },
+    { .name = "MLSD", .func = ftp_cmd_MLSD, .auth_required = 1, .args_required = 0, .data_connection_required = 1 },
     { .name = "SIZE", .func = ftp_cmd_SIZE, .auth_required = 1, .args_required = 1, .data_connection_required = 0 },
     { .name = "MDTM", .func = ftp_cmd_MDTM, .auth_required = 1, .args_required = 1, .data_connection_required = 0 },
     { .name = "OPTS", .func = ftp_cmd_OPTS, .auth_required = 0, .args_required = 1, .data_connection_required = 0 },
