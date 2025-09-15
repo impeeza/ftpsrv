@@ -472,7 +472,13 @@ int vfs_fs_internal_write(struct VfsFsFile* f, const void* buf, size_t size) {
 int vfs_fs_internal_seek(struct VfsFsFile* f, size_t off) {
 #if VFS_NX_BUFFER_IO
     if (!f->is_write) {
-        f->buf_off -= f->off - off;
+        // this can happen with the rest command to set starting offset.
+        if (off > f->off) {
+            f->buf_off = 0;
+            f->buf_size = 0;
+        } else {
+            f->buf_off -= f->off - off;
+        }
     }
 #endif
     f->off = off;
