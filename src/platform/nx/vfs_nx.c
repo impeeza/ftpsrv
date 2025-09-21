@@ -449,11 +449,16 @@ void vfs_nx_init(const struct VfsNxCustomPath* custom, int custom_count, int mou
         // add some shortcuts.
         FsFileSystem* sdmc = fsdev_wrapGetDeviceFileSystem("sdmc");
         if (sdmc) {
-            if (!fsdev_wrapMountDevice("switch", "/switch", *sdmc, false)) {
-                vfs_nx_add_device("switch", VFS_TYPE_FS);
+            if (mount_flags & VfsNxMountFlag_SWITCH) {
+                if (!fsdev_wrapMountDevice("switch", "/switch", *sdmc, false)) {
+                    vfs_nx_add_device("switch", VFS_TYPE_FS);
+                }
             }
-            if (!fsdev_wrapMountDevice("atmosphere_contents", "/atmosphere/contents", *sdmc, false)) {
-                vfs_nx_add_device("atmosphere_contents", VFS_TYPE_FS);
+
+            if (mount_flags & VfsNxMountFlag_AMS_CONTENTS) {
+                if (!fsdev_wrapMountDevice("ams_contents", "/atmosphere/contents", *sdmc, false)) {
+                    vfs_nx_add_device("ams_contents", VFS_TYPE_FS);
+                }
             }
         }
 
