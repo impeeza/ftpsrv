@@ -188,7 +188,18 @@ int main(int argc, char** argv) {
         return error_loop("failed to get current ip address");
     }
 
-    vfs_nx_init(NULL, 0, mount_devices, save_writable, mount_bis, skip_ascii_convert);
+    u32 mount_flags = 0;
+    if (mount_devices) {
+        mount_flags |= VfsNxMountFlag_MOUNT_ALL;
+    }
+    if (mount_bis) {
+        mount_flags |= VfsNxMountFlag_BIS_FS;
+    }
+    if (save_writable) {
+        mount_flags |= VfsNxMountFlag_SAVES_WRITEABLE;
+    }
+
+    vfs_nx_init(NULL, 0, mount_flags, skip_ascii_convert);
 
     const struct in_addr addr = {ip};
     printf(TEXT_YELLOW "ip: %s\n", inet_ntoa(addr));

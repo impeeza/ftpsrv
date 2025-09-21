@@ -172,7 +172,28 @@ struct VfsNxCustomPath {
     FtpVfs* func;
 };
 
-void vfs_nx_init(const struct VfsNxCustomPath* custom, int custom_count, bool enable_devices, bool save_writable, bool mount_bis, bool skip_ascii_convert);
+enum VfsNxMountFlag {
+    VfsNxMountFlag_ALBUM = 1 << 0,
+    VfsNxMountFlag_AMS_CONTENTS = 1 << 1,
+    VfsNxMountFlag_BIS_STORAGE = 1 << 2,
+    VfsNxMountFlag_BIS_FS = 1 << 3,
+    VfsNxMountFlag_CONTENT_SYSTEM = 1 << 4,
+    VfsNxMountFlag_CONTENT_USER = 1 << 5,
+    VfsNxMountFlag_CONTENT_SDCARD = 1 << 6,
+    VfsNxMountFlag_CONTENT_SDCARD0 = 1 << 7,
+    VfsNxMountFlag_CUSTOM_SYSTEM = 1 << 8,
+    VfsNxMountFlag_CUSTOM_SDCARD = 1 << 9,
+    VfsNxMountFlag_SWITCH = 1 << 10,
+    VfsNxMountFlag_GC = 1 << 12,
+    VfsNxMountFlag_SAVES = 1 << 13,
+    VfsNxMountFlag_ROMFS = 1 << 14,
+    VfsNxMountFlag_HDD = 1 << 15,
+
+    VfsNxMountFlag_MOUNT_ALL = 0xFFFF,
+    VfsNxMountFlag_SAVES_WRITEABLE = 1 << 16,
+};
+
+void vfs_nx_init(const struct VfsNxCustomPath* custom, int custom_count, int mount_flags, bool skip_ascii_convert);
 void vfs_nx_exit(void);
 void vfs_nx_add_device(const char* name, enum VFS_TYPE type);
 

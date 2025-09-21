@@ -71,7 +71,18 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    vfs_nx_init(NULL, 0, mount_devices, save_writable, mount_bis, skip_ascii_convert);
+    u32 mount_flags = 0;
+    if (mount_devices) {
+        mount_flags |= VfsNxMountFlag_MOUNT_ALL;
+    }
+    if (mount_bis) {
+        mount_flags |= VfsNxMountFlag_BIS_FS;
+    }
+    if (save_writable) {
+        mount_flags |= VfsNxMountFlag_SAVES_WRITEABLE;
+    }
+
+    vfs_nx_init(NULL, 0, mount_flags, skip_ascii_convert);
 
     int timeout = -1;
     if (g_ftpsrv_config.timeout) {
