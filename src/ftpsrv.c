@@ -737,7 +737,7 @@ static void ftp_cmd_USER(struct FtpSession* session, const char* data) {
     if (rc <= 0 || rc >= sizeof(username)) {
         ftp_client_msg(session, 501, "Syntax error in parameters or arguments.");
     } else if (g_ftp.cfg.anon) {
-        if (strcmp(username, "anonymous")) {
+        if (strcmp(username, "anon") && strcmp(username, "anonymous")) {
             ftp_client_msg(session, 530, "Not logged in.");
         } else {
             session->auth_mode = FTP_AUTH_MODE_VALID;
@@ -758,6 +758,9 @@ static void ftp_cmd_PASS(struct FtpSession* session, const char* data) {
 
     if (rc <= 0 || rc >= sizeof(password)) {
         ftp_client_msg(session, 501, "Syntax error in parameters or arguments.");
+    } else if (g_ftp.cfg.anon && session->auth_mode == FTP_AUTH_MODE_VALID) {
+        // some clients still send pass even after receiving 230 after USER.
+        ftp_client_msg(session, 230, "User logged in, proceed.");
     } else if (session->auth_mode != FTP_AUTH_MODE_NEED_PASS) {
         ftp_client_msg(session, 503, "Bad sequence of commands.");
     } else if (strcmp(password, g_ftp.cfg.pass)) {
