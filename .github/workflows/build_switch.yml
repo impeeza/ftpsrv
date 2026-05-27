@@ -28,7 +28,16 @@ jobs:
         cmake --preset ${{ matrix.preset }} -DUSE_VFS_GC=0
 
     - name: Build
-      run: cmake --build --preset ${{ matrix.preset }} --parallel 4
+      run: |
+        cmake --build --preset ${{ matrix.preset }} --parallel 4
+        mkdir -p dist/sysmod/atmosphere/contents
+        mkdir -p dist/sysmod/config/ftpsrv
+        cp assets/config.ini.template dist/sysmod/config/ftpsrv/config.ini.template
+        cp -r build/switch/420000000000011B dist/sysmod/atmosphere/contents
+        pushd dist/sysmod/
+        zip -r9 ../ftpsrv_sysmod.zip *
+        popd
+
 
     - name: Upload
       uses: actions/upload-artifact@master
