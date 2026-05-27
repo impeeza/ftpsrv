@@ -29,3 +29,9 @@ jobs:
 
     - name: Build
       run: cmake --build --preset ${{ matrix.preset }} --parallel 4
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist
