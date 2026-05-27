@@ -67,6 +67,7 @@ This bug can be observed when viewing a dir with .jpg/.png inside. It will issue
 
 If you dont return the filename, or, return an error code with LIST then kde will send a SIZE and RETR and function normally.
 
+Launch action
 ## credit
 
 - https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
